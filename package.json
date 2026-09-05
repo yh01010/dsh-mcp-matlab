@@ -1,0 +1,20 @@
+{
+  "name": "dsh-mcp-matlab",
+  "version": "0.1.0",
+  "description": "DSH plugin: bridge to the MATLAB MCP server (matlab-mcp-server-windows-x64)",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "mcp",
+    "matlab"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "cordis.patch.yml",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "private": true
+}

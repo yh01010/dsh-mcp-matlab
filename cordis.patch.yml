@@ -1,0 +1,38 @@
+# dsh-mcp-matlab bundle patch: inserts the MATLAB MCP client bridge into a profile's layer stack.
+#
+# Install into a profile (either command works; then restart dsh web):
+#
+#   dsh plugin --profile <name> add github:yh01010/dsh-mcp-matlab
+#   dsh --profile <name> plugin add github:yh01010/dsh-mcp-matlab
+#
+# or list the package in the profile's `dsh.profile.bundles` and `pnpm install`.
+#
+# Backed by the host package `@deepseek-ai/dsh-mcp-client` (already shipped with
+# dsh): one instance connects to one MCP server and registers its tools on
+# `ctx.tools` under `mcp__<serverName>__<rawName>`.
+#
+# ⚠️ This package carries no personal machine paths. The `command`/`args`
+# values below are placeholders — replace them with your own MATLAB MCP server
+# executable and MATLAB installation root. Recommended: override this row by
+# id from `$DSH_HOME/cordis.patch.yml` so you never edit this repo.
+#
+# Config reference (all per stdio transport):
+#   serverName:           tool-name namespace, must be unique per profile
+#   command:              MCP server executable (replace the placeholder!)
+#   args:                 CLI arguments for the server
+#   env:                  extra environment for the server process
+#   cwd:                  working directory (default "")
+#   toolCallTimeoutMs:    per-tool-call timeout (default 60000)
+#   failOnStartupError:   throw if the initial connection fails (default false)
+#   reconnect:            { enabled, initialDelayMs, maxDelayMs, maxAttempts }
+- insert:
+    - id: mcp-matlab
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: matlab
+        transport: stdio
+        command: 'C:\path\to\your\matlab-mcp-server-windows-x64.exe'
+        args:
+          - '--matlab-root=D:\path\to\your\matlab'
+          - '--matlab-display-mode=nodesktop'
+          - '--disable-telemetry'
