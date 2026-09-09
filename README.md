@@ -114,6 +114,16 @@ This is a **provider-vs-empty-`inputSchema`** compatibility issue. It concerns t
 
 To add a different MCP server, **create a separate plugin** or add it to your **user-level** `$DSH_HOME/cordis.patch.yml` — do not fold unrelated servers into this repo. This repo is scoped to the MATLAB bridge; mixing servers blurs the boundary. Keep `serverName` unique across whichever layer you add it to.
 
+## Validate
+
+A lightweight structural check lives at the repo root (`validate.mjs`). Run it after editing the config:
+
+```sh
+node validate.mjs
+```
+
+It verifies: `package.json` parses and declares `dsh.bundle.patch`; the patch file has the key fields (`id: mcp-matlab`, `serverName: matlab`, `transport: stdio`, `command:`); no personal machine path is committed; and the README title is present. It exits non-zero on any failure. (There is currently no CI workflow in `.github/workflows/` because this repo's git object store does not accept creating that nested directory via the API; the script is the maintained check.)
+
 ## License
 
 MIT
