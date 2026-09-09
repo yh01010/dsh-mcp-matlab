@@ -22,8 +22,12 @@
 #   args:                 CLI arguments for the server
 #   env:                  extra environment for the server process
 #   cwd:                  working directory (default "")
-#   toolCallTimeoutMs:    per-tool-call timeout (default 60000)
-#   failOnStartupError:   throw if the initial connection fails (default false)
+#   toolCallTimeoutMs:    per-tool-call timeout, ms. MATLAB cold start +
+#                         toolbox load can exceed the 60s default, so we raise
+#                         it here (default 60000).
+#   failOnStartupError:   throw if the initial connection fails (default false).
+#                         true surfaces a broken path/root on boot instead of a
+#                         silently-missing tool set.
 #   reconnect:            { enabled, initialDelayMs, maxDelayMs, maxAttempts }
 - insert:
     - id: mcp-matlab
@@ -36,3 +40,5 @@
           - '--matlab-root=D:\path\to\your\matlab'
           - '--matlab-display-mode=nodesktop'
           - '--disable-telemetry'
+        toolCallTimeoutMs: 120000
+        failOnStartupError: true
