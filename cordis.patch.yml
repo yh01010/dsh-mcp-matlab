@@ -11,10 +11,20 @@
 # dsh): one instance connects to one MCP server and registers its tools on
 # `ctx.tools` under `mcp__<serverName>__<rawName>`.
 #
-# ⚠️ This package carries no personal machine paths. The `command`/`args`
-# values below are placeholders — replace them with your own MATLAB MCP server
-# executable and MATLAB installation root. Recommended: override this row by
-# id from `$DSH_HOME/cordis.patch.yml` so you never edit this repo.
+# ⚠️ INSTALLING THIS PACKAGE DOES NOT GIVE YOU WORKING MATLAB TOOLS.
+# This package carries no personal machine paths, so `command`/`args` below are
+# placeholders. Until you replace them, the bridge cannot spawn the server and
+# no `mcp__matlab__*` tool is registered. See "安装后还需要三步" in README.md.
+#
+# Recommended: override this row BY ID from `$DSH_HOME/cordis.patch.yml` — a
+# non-insert entry with the same id, carrying only your real `config`. Never
+# edit this file in an installed package (reinstalls overwrite it).
+#
+# ⚠️ Do NOT `insert` a second `mcp-matlab` row from the home patch while this
+# bundle is installed. Two rows sharing one id mean two mcp-client instances on
+# serverName `matlab`, and the second one aborts startup with
+# `serverName "matlab" is already in use by another mcp-client instance`.
+# Pick one wiring: bundled row + id override, or no bundle + home insert.
 #
 # Config reference (all per stdio transport):
 #   serverName:           tool-name namespace, must be unique per profile
@@ -26,8 +36,11 @@
 #                         toolbox load can exceed the 60s default, so we raise
 #                         it here (default 60000).
 #   failOnStartupError:   throw if the initial connection fails (default false).
-#                         true surfaces a broken path/root on boot instead of a
-#                         silently-missing tool set.
+#                         Keep it false here on purpose: with the placeholder
+#                         path above, true would abort EVERY dsh boot until the
+#                         user fills in real paths — the plugin would be
+#                         uninstallable. Enable it only after you verified your
+#                         own command/matlab-root.
 #   reconnect:            { enabled, initialDelayMs, maxDelayMs, maxAttempts }
 - insert:
     - id: mcp-matlab
@@ -41,4 +54,4 @@
           - '--matlab-display-mode=nodesktop'
           - '--disable-telemetry'
         toolCallTimeoutMs: 120000
-        failOnStartupError: true
+        failOnStartupError: false

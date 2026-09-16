@@ -1,5 +1,13 @@
 # dsh-mcp-matlab 插件说明
 
+> [!IMPORTANT]
+> **装完不能直接用。** 本插件只是"接线"，它**不含 MATLAB，也不含 MATLAB MCP Server 可执行文件**。从插件市场/命令安装后，你还需要自己准备这两样外部依赖并填好路径，`mcp__matlab__*` 工具才会出现。
+>
+> - **自己配**：按下面的 [安装后还需要三步](#安装后还需要三步) 做。
+> - **让 AI 帮你配**：把 [这段提示词](#让-ai-帮你完成配置) 原样发给你的 DSH 会话，剩下的交给它。
+>
+> 安装本身不会再让 DSH 崩溃（`failOnStartupError` 已默认 `false`）；配置不对时的表现是"**没有工具**"，而不是"起不来"。
+
 ## 这是什么
 
 `dsh-mcp-matlab` 是一个 **DSH（DeepSeek Harness）桥接插件**，用来把本地安装的 MATLAB MCP Server 接入 DSH，让你能在 DSH 会话里直接调用 MATLAB。
@@ -26,7 +34,7 @@
 dsh plugin --profile desktop add github:yh01010/dsh-mcp-matlab
 ```
 
-（`desktop` 换成你的 profile 名。）安装后**重启 DSH** 生效。
+（`desktop` 换成你的 profile 名。）安装后**重启 DSH** 生效——但注意：重启后**不会自动出现工具**，还要做完 [安装后还需要三步](#安装后还需要三步)。
 
 也可以把 `dsh-mcp-matlab` 加入 profile 的 `package.json` → `dsh.profile.bundles` 后 `pnpm install`，重启生效。
 
@@ -40,13 +48,56 @@ dsh plugin --profile desktop add github:yh01010/dsh-mcp-matlab
 2. **一个能正常启动的 MATLAB 安装**——且许可证可用。`--matlab-root` 指向它的安装根目录。
 3. **正确的路径**——把插件里的占位路径替换成你机器上真实存在的路径（见"配置"）。
 
-没有这三样，只装这个插件是**起不来、也不会出现工具**的。
+没有这三样，只装这个插件是**不会出现工具**的（DSH 本身仍能正常启动，不会因为缺依赖而崩溃）。
+
+## 安装后还需要三步
+
+1. **拿到 MATLAB MCP Server 可执行文件** `matlab-mcp-server-windows-x64.exe`：从 [MathWorks 官方仓库的 Latest Release](https://github.com/matlab/matlab-mcp-server/releases/latest) 下载（或自行编译）。放到一个固定目录，例如 `%USERPROFILE%\.local\bin\`。
+2. **确认 MATLAB 可被启动**：MATLAB R2021a 或更新版本，且许可证可用。`--matlab-root` 可以省略——Server 默认从系统 PATH 找第一个 MATLAB；显式指定更稳。
+3. **填真实路径并重启**：按 [配置](#配置) 一节在 `$DSH_HOME/cordis.patch.yml` 里覆盖 `command`，重启 DSH，工具列表里应出现 `mcp__matlab__*`。
+
+## 让 AI 帮你完成配置
+
+不想手改配置，就把下面这段原样发给你的 DSH 会话（两处路径换成你自己的）：
+
+```text
+请帮我把 DSH 的 MATLAB 插件（dsh-mcp-matlab）配置到可用状态，参考
+https://github.com/yh01010/dsh-mcp-matlab 的 README。
+
+现状：插件包已装好，但 mcp__matlab__* 工具没出现，因为
+cordis.patch.yml 里还是占位路径。
+
+请依次做：
+1. 检查 MATLAB MCP Server 可执行文件是否存在；没有就告诉我从
+   https://github.com/matlab/matlab-mcp-server/releases/latest
+   下载哪个文件、放到哪里。
+2. 用 Test-Path 确认 MATLAB 安装根目录。
+3. 编辑 $DSH_HOME/cordis.patch.yml，用「id 覆盖」写法（不要用 insert，
+   否则会出现两行同 id，serverName 冲突导致启动中止）填上真实路径：
+   command: <exe 的完整路径>
+   args 里 --matlab-root=<MATLAB 安装根目录>
+4. 提醒我重启 DSH，重启后确认 mcp__matlab__* 工具是否出现。
+
+不要改动插件包内部的 cordis.patch.yml。
+```
+
+> 前提：会话要有该文件的写入权限。`$DSH_HOME` 通常在会话工作区之外，可能触发一次权限确认。
 
 ## 配置
 
 本插件**刻意不携带任何个人机器路径**，`cordis.patch.yml` 里的 `command`/`args` 是占位符。你必须改成自己机器上的真实路径。
 
-推荐在你本机的 `$DSH_HOME/cordis.patch.yml`（用户级覆盖，优先级高于插件的 bundle 行）里覆盖，这样不用改插件仓库：
+两种接法 **二选一，不要同时用**：
+
+| 你的情况 | `$DSH_HOME/cordis.patch.yml` 里怎么写 |
+| --- | --- |
+| **已装了插件包**（市场/`dsh plugin add`） | 只写 **id 覆盖**（下面那段 `- id: mcp-matlab`，**不要** `insert`）。包里的 bundle 行已经插入了这一行，覆盖它的 `config` 即可 |
+| **没装插件包**，手工接线 | 用 `insert` 把整行插进去（见下方折叠块） |
+
+> [!WARNING]
+> 插件包已装、又在 home patch 里 `insert` 同一 id 的行 → 会得到**两行同 id** → 两个 mcp-client 实例抢 `serverName: matlab` → DSH 启动时报 `serverName "matlab" is already in use by another mcp-client instance` 并中止。这是最容易踩的坑。
+
+id 覆盖写法（**装了插件包时用这个**，不会改到仓库文件）：
 
 ```yaml
 # $DSH_HOME/cordis.patch.yml
@@ -61,8 +112,32 @@ dsh plugin --profile desktop add github:yh01010/dsh-mcp-matlab
       - '--matlab-display-mode=nodesktop'
       - '--disable-telemetry'
     toolCallTimeoutMs: 120000
-    failOnStartupError: true
+    failOnStartupError: false
 ```
+
+<details>
+<summary>不装插件包时的手工接法（<code>insert</code> 整行）</summary>
+
+```yaml
+# $DSH_HOME/cordis.patch.yml
+- insert:
+    - id: mcp-matlab
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: matlab
+        transport: stdio
+        command: 'C:\Users\<你的用户名>\.local\bin\matlab-mcp-server-windows-x64.exe'
+        args:
+          - '--matlab-root=D:\path\to\your\matlab'
+          - '--matlab-display-mode=nodesktop'
+          - '--disable-telemetry'
+        toolCallTimeoutMs: 120000
+        failOnStartupError: false
+```
+
+这种方式下**不要**再装插件包，否则与上面的坑同源。
+
+</details>
 
 关键配置项：
 
@@ -72,7 +147,7 @@ dsh plugin --profile desktop add github:yh01010/dsh-mcp-matlab
 | `serverName` | 工具名前缀，profile 内须唯一 | `matlab` |
 | `--matlab-root` | MATLAB 安装根目录 | 占位符 |
 | `toolCallTimeoutMs` | 单次工具调用超时（ms）。MATLAB 冷启动 + 加载工具箱可能超过 60 秒，故调大 | 60000 |
-| `failOnStartupError` | 启动失败时立即抛错，而不是静默缺少工具 | false |
+| `failOnStartupError` | 启动失败时立即抛错，而不是静默缺少工具。**开启会让 DSH 起不来**（每次启动都中止），只在路径已验证后再开 | false |
 | `reconnect` | 断线重连策略 | 关闭 |
 
 **路径含空格**：在 YAML 单引号字符串里直接写整串即可，例如：
@@ -107,7 +182,8 @@ dsh plugin --profile desktop add github:yh01010/dsh-mcp-matlab
 
 | 现象 | 可能原因 |
 | --- | --- |
-| 看不到 `mcp__matlab__*` 工具 | 路径/安装目录错、Server 没起来、patch 没生效、`serverName` 冲突 |
+| 看不到 `mcp__matlab__*` 工具 | 最常见：占位路径还没换成真实路径（刚装完就是这个状态）。其余：路径/安装目录错、Server 没起来、patch 没生效 |
+| 装完重启后 DSH 起不来 | ① home patch 里 `insert` 了与插件包重复的 `mcp-matlab` 行 → `serverName` 冲突；删掉重复的那条 `insert`。② 你自己把 `failOnStartupError` 开成了 `true` 且路径错；设回 `false` 或改对路径 |
 | 工具可见但调用报 JSON Schema 错误 | 模型供应商（如阿里 DashScope）不接受空参数 schema |
 | 工具调用超时 | MATLAB 冷启动/加载工具箱超过 `toolCallTimeoutMs`（调大它） |
 | DSH 因该插件无法启动 | `failOnStartupError: true` + 路径错；改路径或设回 false |
