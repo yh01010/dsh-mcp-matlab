@@ -52,8 +52,8 @@ dsh plugin --profile desktop add github:yh01010/dsh-mcp-matlab
 
 ## 安装后还需要三步
 
-1. **拿到 MATLAB MCP Server 可执行文件** `matlab-mcp-server-windows-x64.exe`：从 [MathWorks 官方仓库的 Latest Release](https://github.com/matlab/matlab-mcp-server/releases/latest) 下载（或自行编译）。放到一个固定目录，例如 `%USERPROFILE%\.local\bin\`。
-2. **确认 MATLAB 可被启动**：MATLAB R2021a 或更新版本，且许可证可用。`--matlab-root` 可以省略——Server 默认从系统 PATH 找第一个 MATLAB；显式指定更稳。
+1. **拿到 MATLAB MCP Server 可执行文件** `matlab-mcp-server-windows-x64.exe`：从 [MathWorks 官方仓库的 Latest Release](https://github.com/matlab/matlab-mcp-server/releases/latest) 下载（或自行编译）。用官方 Agentic Toolkit 安装器时它默认就在 `%USERPROFILE%\.matlab\agentic-toolkits\bin\`；手动下载的话放到固定的自定义目录，例如 `%USERPROFILE%\.local\bin\`。
+2. **确认 MATLAB 可被启动**：许可证可用，且 `--matlab-root` 能指向它的安装根目录。本项目只在 **MATLAB R2025a** 上实测过，其他版本没有验证记录（见 [兼容性](#兼容性不同-matlab-版本)）。`--matlab-root` 可以省略——Server 默认从系统 PATH 找第一个 MATLAB；显式指定更稳。
 3. **填真实路径并重启**：按 [配置](#配置) 一节在 `$DSH_HOME/cordis.patch.yml` 里覆盖 `command`，重启 DSH，工具列表里应出现 `mcp__matlab__*`。
 
 ## 让 AI 帮你完成配置
@@ -70,7 +70,8 @@ cordis.patch.yml 里还是占位路径。
 请依次做：
 1. 检查 MATLAB MCP Server 可执行文件是否存在；没有就告诉我从
    https://github.com/matlab/matlab-mcp-server/releases/latest
-   下载哪个文件、放到哪里。
+   下载哪个文件、放到哪里。Agentic Toolkit 安装器的默认位置是
+   %USERPROFILE%\.matlab\agentic-toolkits\bin\，手动放的话一般是 %USERPROFILE%\.local\bin\。
 2. 用 Test-Path 确认 MATLAB 安装根目录。
 3. 编辑 $DSH_HOME/cordis.patch.yml，用「id 覆盖」写法（不要用 insert，
    否则会出现两行同 id，serverName 冲突导致启动中止）填上真实路径：
@@ -106,10 +107,13 @@ id 覆盖写法（**装了插件包时用这个**，不会改到仓库文件）�
   config:
     serverName: matlab
     transport: stdio
-    command: 'C:\Users\<你的用户名>\.local\bin\matlab-mcp-server-windows-x64.exe'
+    # Agentic Toolkit 安装器的默认位置；手动下载的换成你自己放的路径
+    command: 'C:\Users\<你的用户名>\.matlab\agentic-toolkits\bin\matlab-mcp-server-windows-x64.exe'
     args:
       - '--matlab-root=D:\path\to\your\matlab'
       - '--matlab-display-mode=nodesktop'
+      # 显式 pin new：默认 auto 会先去连已存在的会话，容易踩残留会话
+      - '--matlab-session-mode=new'
       - '--disable-telemetry'
     toolCallTimeoutMs: 120000
     failOnStartupError: false
@@ -126,10 +130,11 @@ id 覆盖写法（**装了插件包时用这个**，不会改到仓库文件）�
       config:
         serverName: matlab
         transport: stdio
-        command: 'C:\Users\<你的用户名>\.local\bin\matlab-mcp-server-windows-x64.exe'
+        command: 'C:\Users\<你的用户名>\.matlab\agentic-toolkits\bin\matlab-mcp-server-windows-x64.exe'
         args:
           - '--matlab-root=D:\path\to\your\matlab'
           - '--matlab-display-mode=nodesktop'
+          - '--matlab-session-mode=new'
           - '--disable-telemetry'
         toolCallTimeoutMs: 120000
         failOnStartupError: false
@@ -141,14 +146,17 @@ id 覆盖写法（**装了插件包时用这个**，不会改到仓库文件）�
 
 关键配置项：
 
-| 字段 | 含义 | 默认 |
+| 字段 | 含义 | 宿主默认 |
 | --- | --- | --- |
 | `command` | MATLAB MCP Server 可执行文件 | 占位符（必填） |
 | `serverName` | 工具名前缀，profile 内须唯一 | `matlab` |
 | `--matlab-root` | MATLAB 安装根目录 | 占位符 |
+| `--matlab-session-mode` | 会话模式：`new` 新起专用会话（推荐）；`auto`/`existing` 复用已有会话（见下文「显示模式与会话模式」） | `auto` |
 | `toolCallTimeoutMs` | 单次工具调用超时（ms）。MATLAB 冷启动 + 加载工具箱可能超过 60 秒，故调大 | 60000 |
 | `failOnStartupError` | 启动失败时立即抛错，而不是静默缺少工具。**开启会让 DSH 起不来**（每次启动都中止），只在路径已验证后再开 | false |
-| `reconnect` | 断线重连策略 | 关闭 |
+| `reconnect` | 断线重连策略 | **默认就是开启的**：500ms 起、指数退避到 30s、最多 10 次（`{ enabled: true, initialDelayMs: 500, maxDelayMs: 30000, maxAttempts: 10 }`） |
+
+> 表里的「宿主默认」是 DSH 自带的默认值。本包模板把 `toolCallTimeoutMs` 覆盖成 **120000**（作者本机也是 120000），所以你按本 README 配完看到的不是 60000——这是期望行为，不是写错了。
 
 **路径含空格**：在 YAML 单引号字符串里直接写整串即可，例如：
 
@@ -156,13 +164,39 @@ id 覆盖写法（**装了插件包时用这个**，不会改到仓库文件）�
     command: 'C:\Users\<你的用户名>\matlab mcp\matlab-mcp-server-windows-x64.exe'
 ```
 
+### 显示模式与会话模式
+
+两个参数各管一件事，别混：
+
+- `--matlab-display-mode`：`nodesktop` = 不起 MATLAB 桌面（没有图形窗口，绘图、交互式调试受限）；不传则用桌面模式。
+- `--matlab-session-mode`（Server v0.13.0+）：`new` = 每次新起一个专用 MATLAB 会话（推荐，干净）；`existing` = 复用已在跑的那个会话；`auto` 是默认值，会先试已有会话再决定。
+
+两个坑：
+
+1. **`existing` 不能和 `--matlab-root` 同用**（`--initial-working-folder` 同理），上游明确要求。
+2. 默认的 `auto` 在本机踩过：残留的旧会话让 Server 去连一个并不存在的会话，最后报 `Failed to get MATLAB Client: no valid MATLAB environments found`。显式写 `--matlab-session-mode=new` 最省事。
+
+上游 README 里 "MATLAB desktop is visible to the user" 那句只对桌面模式/已有会话成立，`nodesktop` 下没有窗口。
+
+其它可选参数（`--help` 可看全量）：
+
+| 参数 | 作用 |
+| --- | --- |
+| `--initialize-matlab-on-startup` | DSH 启动时就把 MATLAB 拉起来，第一次调用不用等冷启动 |
+| `--initial-working-folder` | 指定 MATLAB 启动时的工作目录 |
+| `--log-folder` | Server 日志目录（默认在系统临时目录） |
+| `--log-level` | 日志级别 |
+| `--extension-file` | 加载自定义扩展（高级） |
+
 ## 安装后验证
 
 1. 重启 DSH 后，看工具列表里是否出现 `mcp__matlab__*`。
 2. 若没有，先手动确认 Server 和 MATLAB 路径存在、Server 能独立启动：
 
    ```powershell
-   Test-Path 'C:\Users\<你的用户名>\.local\bin\matlab-mcp-server-windows-x64.exe'
+   # 两条 exe 路径按你的实际位置二选一；Agentic Toolkit 安装器一般在上面的位置
+   Test-Path "$env:USERPROFILE\.matlab\agentic-toolkits\bin\matlab-mcp-server-windows-x64.exe"
+   Test-Path "$env:USERPROFILE\.local\bin\matlab-mcp-server-windows-x64.exe"
    Test-Path 'D:\path\to\your\matlab'
    ```
 
@@ -172,11 +206,26 @@ id 覆盖写法（**装了插件包时用这个**，不会改到仓库文件）�
 
 **本插件与 MATLAB 版本无关**——它不检查版本，只把 `--matlab-root` 传给 Server。所以从插件角度，任何装好可用 MATLAB 的版本都能接。
 
-真正决定兼容性的是 **MATLAB MCP Server 本体**：
+真正决定兼容性的是 **MATLAB MCP Server 本体**和它配套的 **MATLAB MCP Server Toolbox**——这是两个独立的版本号，别混：
 
-- 已在 **MATLAB R2025a**（25.1.0.2943329）+ **MATLAB MCP Server Toolbox 0.3.1** 下实测通过（`evaluate_matlab_code` 正确返回 `1+1=2`、`pi*2=6.2832`；`detect_matlab_toolboxes` 列出 100+ 工具箱）。
-- 该 MCP Server Toolbox 自身标记为 R2026a，但能正常驱动 R2025a，说明它**跨主版本兼容**。
-- 但不保证所有版本：过老的 MATLAB（如 R2019 之前）或实验性版本，可能因 MCP Server 用到的 MATLAB API 不存在而受限。**只能实测确认**，插件无法预知。
+| 组件 | 本机实测版本 | 说明 |
+| --- | --- | --- |
+| Server exe（`matlab-mcp-server-windows-x64.exe`） | **v0.16.1** | 决定工具集与行为，`--version` 可查 |
+| MATLAB MCP Server Toolbox（装在 MATLAB 里的 `.mltbx`） | **0.5.0**（`Contents.m` 标 R2026b） | 必须与 Server 同批升级，见下 |
+
+已验证组合：MATLAB R2025a（25.1.0.2943329）+ Server v0.16.1 + Toolbox 0.5.0——`evaluate_matlab_code` 返回 `disp(1+1)` → `2`；`detect_matlab_toolboxes` 正常列出工具箱；代码报错时返回 **tool error（`isError: true`）**，这是 v0.16.0 起的新语义，不是接线故障。
+
+> 注：`matlab.addons.installedAddons` 可能仍显示旧版本号（`.mltbx` 的安装记录不会随 `--setup-matlab` 刷新），判断以 `detect_matlab_toolboxes` 为准。
+
+升级 Server 时**要同步升级 Toolbox**（v0.11.2 起 toolbox 由 server 自带安装）：
+
+```powershell
+# 先停掉 DSH 里的 MCP 连接；成功输出 Successfully setup MATLAB.
+'C:\Users\<你的用户名>\.matlab\agentic-toolkits\bin\matlab-mcp-server-windows-x64.exe' `
+  --setup-matlab --matlab-root=D:\path\to\your\matlab --matlab-session-mode=new
+```
+
+但不保证所有版本：过老的 MATLAB（如 R2019 之前）或实验性版本，可能因 Server 用到的 MATLAB API 不存在而受限。**只能实测确认**，插件无法预知。
 
 ## 排障
 
@@ -187,6 +236,9 @@ id 覆盖写法（**装了插件包时用这个**，不会改到仓库文件）�
 | 工具可见但调用报 JSON Schema 错误 | 模型供应商（如阿里 DashScope）不接受空参数 schema |
 | 工具调用超时 | MATLAB 冷启动/加载工具箱超过 `toolCallTimeoutMs`（调大它） |
 | DSH 因该插件无法启动 | `failOnStartupError: true` + 路径错；改路径或设回 false |
+| 日志里报 `no valid MATLAB environments found` | 会话模式是 `auto`/`existing` 且找不到可用的已有会话；显式加 `--matlab-session-mode=new` |
+| 日志里报 `Failed to create subdirectory`（或 `Failed to create file "…\.matlab-mcp-server"`） | exe 放在受策略限制的目录（例如 DSH 的工作区目录）被文件策略挡住；把 exe 挪到用户目录后重启 DSH |
+| 调用返回 `isError: true` | v0.16.0 起 MATLAB 侧报错即以 tool error 返回（含 error identifier），不是桥接故障；看错误文本定位代码问题 |
 
 ## 已知问题：空参数 JSON Schema
 
@@ -212,4 +264,4 @@ MIT
 
 ## 说明来源
 
-本说明基于作者本机实测：MATLAB R2025a（25.1.0.2943329）、MATLAB MCP Server Toolbox 0.3.1、`matlab-mcp-server-windows-x64.exe`。
+本说明基于作者本机实测：MATLAB R2025a（25.1.0.2943329）、`matlab-mcp-server-windows-x64.exe`（Server **v0.16.1**）、MATLAB MCP Server Toolbox **0.5.0**。
