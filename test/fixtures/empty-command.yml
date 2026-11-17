@@ -1,0 +1,8 @@
+- id: mcp-matlab
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: matlab
+    transport: stdio
+    command: ''
+    args:
+      - '--matlab-root=D:\path\to\your\matlab'

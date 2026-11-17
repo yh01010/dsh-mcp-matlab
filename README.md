@@ -53,7 +53,7 @@ dsh plugin --profile desktop add github:yh01010/dsh-mcp-matlab
 ## 安装后还需要三步
 
 1. **拿到 MATLAB MCP Server 可执行文件** `matlab-mcp-server-windows-x64.exe`：从 [MathWorks 官方仓库的 Latest Release](https://github.com/matlab/matlab-mcp-server/releases/latest) 下载（或自行编译）。用官方 Agentic Toolkit 安装器时它默认就在 `%USERPROFILE%\.matlab\agentic-toolkits\bin\`；手动下载的话放到固定的自定义目录，例如 `%USERPROFILE%\.local\bin\`。
-2. **确认 MATLAB 可被启动**：许可证可用，且 `--matlab-root` 能指向它的安装根目录。本项目只在 **MATLAB R2025a** 上实测过，其他版本没有验证记录（见 [兼容性](#兼容性不同-matlab-版本)）。`--matlab-root` 可以省略——Server 默认从系统 PATH 找第一个 MATLAB；显式指定更稳。
+2. **确认 MATLAB 可被启动**：许可证可用，且 `--matlab-root` 能指向它的安装根目录。本项目只在 **MATLAB R2025a** 上实测过，其他版本没有验证记录（见 [兼容性](#兼容性)）。`--matlab-root` 可以省略——Server 默认从系统 PATH 找第一个 MATLAB；显式指定更稳。
 3. **填真实路径并重启**：按 [配置](#配置) 一节在 `$DSH_HOME/cordis.patch.yml` 里覆盖 `command`，重启 DSH，工具列表里应出现 `mcp__matlab__*`。
 
 ## 让 AI 帮你完成配置
@@ -188,30 +188,40 @@ id 覆盖写法（**装了插件包时用这个**，不会改到仓库文件）�
 | `--log-level` | 日志级别 |
 | `--extension-file` | 加载自定义扩展（高级） |
 
-## 安装后验证
+## 安装后验证：五层定位
 
-1. 重启 DSH 后，看工具列表里是否出现 `mcp__matlab__*`。
-2. 若没有，先手动确认 Server 和 MATLAB 路径存在、Server 能独立启动：
+工具没出现、或出现了但调用失败，**从下往上逐层查**，每一层都能单独判定成败，不要凭猜改配置：
 
-   ```powershell
-   # 两条 exe 路径按你的实际位置二选一；Agentic Toolkit 安装器一般在上面的位置
-   Test-Path "$env:USERPROFILE\.matlab\agentic-toolkits\bin\matlab-mcp-server-windows-x64.exe"
-   Test-Path "$env:USERPROFILE\.local\bin\matlab-mcp-server-windows-x64.exe"
-   Test-Path 'D:\path\to\your\matlab'
-   ```
+| 层 | 查什么 | 怎么查 | 这一层失败意味着 |
+| --- | --- | --- | --- |
+| 1 路径 | `command` 的 exe、`--matlab-root` 的目录是否真的存在 | 下方 `Test-Path` | 占位符没换/路径写错。改 `$DSH_HOME/cordis.patch.yml` |
+| 2 进程 | DSH 有没有把 Server 拉起来 | `Get-Process -Name matlab-mcp-server-windows-x64 -ErrorAction SilentlyContinue` | 没有进程：patch 没生效、id 写错，或 exe 被文件策略挡住 |
+| 3 握手 | 与 DSH 的 MCP `initialize` 是否成功 | DSH 日志里该 server 的连接记录；或按第 1 层的路径手动跑一次 exe 看输出 | 报错文本直接指向原因（路径、会话模式、许可证） |
+| 4 枚举 | `tools/list` 返回几个工具 | 数工具列表里的 `mcp__matlab__*`，应为 **5 个**（见 [功能](#功能)） | 0 个 = 第 3 层就没通；少 1–2 个 = 后端版本不同 |
+| 5 最小调用 | 真的能跑一次吗 | `evaluate_matlab_code` 传 `disp(1+1)`，应回 `2` | 回 `isError: true` 是 MATLAB 侧报错（v0.16.0+ 语义），读懂错误文本即可 |
 
-   Server 能独立启动但工具仍不出现，说明问题在 DSH 接线（patch/配置），不在 Server。
+第 1 层的命令（两条 exe 路径按你的实际位置二选一；Agentic Toolkit 安装器一般用第一条）：
 
-## 兼容性：不同 MATLAB 版本
+```powershell
+Test-Path "$env:USERPROFILE\.matlab\agentic-toolkits\bin\matlab-mcp-server-windows-x64.exe"
+Test-Path "$env:USERPROFILE\.local\bin\matlab-mcp-server-windows-x64.exe"
+Test-Path 'D:\path\to\your\matlab'
+```
 
-**本插件与 MATLAB 版本无关**——它不检查版本，只把 `--matlab-root` 传给 Server。所以从插件角度，任何装好可用 MATLAB 的版本都能接。
+Server 能独立启动但工具仍不出现，说明问题在 DSH 接线（patch/配置），不在 Server。
 
-真正决定兼容性的是 **MATLAB MCP Server 本体**和它配套的 **MATLAB MCP Server Toolbox**——这是两个独立的版本号，别混：
+## 兼容性
 
-| 组件 | 本机实测版本 | 说明 |
-| --- | --- | --- |
-| Server exe（`matlab-mcp-server-windows-x64.exe`） | **v0.16.1** | 决定工具集与行为，`--version` 可查 |
-| MATLAB MCP Server Toolbox（装在 MATLAB 里的 `.mltbx`） | **0.5.0**（`Contents.m` 标 R2026b） | 必须与 Server 同批升级，见下 |
+有四条独立的版本轴，别混在一起看：**MATLAB 版本**、**Server exe 版本**、**Toolbox 版本**、**DSH 版本**。本插件本身与版本无关——它不检查版本，只把 `--matlab-root` 传给 Server。
+
+| 项目 | 上游声明 | 本机已实测 | 未验证 |
+| --- | --- | --- | --- |
+| MATLAB | Server 未规定最低版本（旧文档出现过 R2021a，但它在二进制里只作为编码规范示例出现，不是启动门槛） | R2025a（25.1.0.2943329） | R2024b 及更早、R2026a 及更新 |
+| Server exe（`matlab-mcp-server-windows-x64.exe`） | v0.16.1 为最新 release | **v0.16.1** | 更早版本的行为差异：v0.16.0 之前 MATLAB 报错不走 `isError` |
+| MATLAB MCP Server Toolbox（`.mltbx`） | v0.11.2 起由 `--setup-matlab` 随 Server 一起装，版本须与 Server 配套 | **0.5.0**（`Contents.m` 标 R2026b） | 与旧 Server 混搭的组合 |
+| DSH（宿主 `@deepseek-ai/dsh-mcp-client`） | 无版本门槛，配置字段即全部约定 | 0.2.2-rc.3（`@deepseek-ai/dsh-desktop-runtime`） | 更早/更新的 DSH |
+
+验证日期 **2026-11-15**，单机实测环境：Windows 11 家庭中文版（10.0.22631）+ 上表版本。
 
 已验证组合：MATLAB R2025a（25.1.0.2943329）+ Server v0.16.1 + Toolbox 0.5.0——`evaluate_matlab_code` 返回 `disp(1+1)` → `2`；`detect_matlab_toolboxes` 正常列出工具箱；代码报错时返回 **tool error（`isError: true`）**，这是 v0.16.0 起的新语义，不是接线故障。
 
@@ -257,6 +267,24 @@ dsh plugin --profile desktop remove dsh-mcp-matlab
 ```
 
 （或从 `dsh.profile.bundles` 移除后 `pnpm install`），重启生效。想临时停用，可在 profile 的 `cordis.patch.yml` 里给 `mcp-matlab` 行加 `disabled: true`。
+
+## 本地检查
+
+仓库自带结构校验，不靠字符串匹配（需要 Node 20+，唯一依赖是 `yaml`）：
+
+```sh
+npm ci
+npm run validate   # 解析 cordis.patch.yml，逐项检查 id/name/config 字段
+npm test           # 5 个用例：正常 / 全注释 / YAML 损坏 / command 为空 / 重复 id
+```
+
+改完 home patch 想先自检，可以直接校验单文件：
+
+```sh
+node validate.mjs --patch "$env:USERPROFILE\.dsh\cordis.patch.yml"
+```
+
+CI（`.github/workflows/validate.yml`）在每次 push 和 PR 跑同样的两条命令，YAML 语法错误或结构错误会让 CI 变红。
 
 ## 许可证
 

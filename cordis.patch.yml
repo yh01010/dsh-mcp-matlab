@@ -52,6 +52,12 @@
         args:
           - '--matlab-root=D:\path\to\your\matlab'
           - '--matlab-display-mode=nodesktop'
+          # v0.13.0+: pin the MATLAB session mode. The default `auto` attaches to
+          # an existing session first and then fails with
+          # `Failed to get MATLAB Client: no valid MATLAB environments found`
+          # when a stale one is still registered. Drop this flag only if you
+          # deliberately want `auto`.
+          - '--matlab-session-mode=new'
           - '--disable-telemetry'
         toolCallTimeoutMs: 120000
         failOnStartupError: false

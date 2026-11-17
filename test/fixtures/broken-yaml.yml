@@ -1,0 +1,5 @@
+- id: mcp-matlab
+  name: '@deepseek-ai/dsh-mcp-client'
+  config: { serverName: matlab
+    transport: stdio
+    command: 'C:\path\to\matlab-mcp-server-windows-x64.exe'

@@ -1,0 +1,20 @@
+- id: mcp-matlab
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: matlab
+    transport: stdio
+    command: 'C:\path\to\matlab-mcp-server-windows-x64.exe'
+    args:
+      - '--matlab-root=D:\path\to\your\matlab'
+      - '--matlab-display-mode=nodesktop'
+      - '--disable-telemetry'
+    toolCallTimeoutMs: 120000
+    failOnStartupError: false
+
+- insert:
+    - id: mcp-extra
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: extra
+        transport: stdio
+        command: 'C:\path\to\other-server.exe'
